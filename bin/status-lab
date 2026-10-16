@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Mostra o estado do ambiente: contêineres, papel de cada servidor e a replicação.
+set -uo pipefail
+# shellcheck source=bin/_comum.sh
+source "$(dirname "$(readlink -f "$0")")/_comum.sh"
+
+echo "== Contêineres =="
+compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}\t{{.Ports}}" 2> /dev/null \
+  || echo "(docker compose indisponível)"
+
+echo
+echo "== Servidores =="
+printf "%-14s %-7s %-10s %-10s %s\n" "servidor" "porta" "server_id" "read_only" "super_read_only"
+for par in "admin-writer 3306" "admin-reader 3307"; do
+  cfg="${par% *}"
+  porta="${par#* }"
+  if linha="$(mysql_cfg "$cfg" -N -B -e "SELECT @@hostname, @@server_id, @@read_only, @@super_read_only" 2> /dev/null)"; then
+    IFS=$'\t' read -r host id ro sro <<< "$linha"
+    printf "%-14s %-7s %-10s %-10s %s\n" "$host" "$porta" "$id" "$ro" "$sro"
+  else
+    printf "%-14s %-7s %s\n" "mysql-${cfg#admin-}" "$porta" "✘ não respondeu"
+  fi
+done
+
+echo
+echo "== Replicação (mysql-reader ← mysql-writer) =="
+status="$(mysql_cfg admin-reader -e "SHOW REPLICA STATUS\G" 2> /dev/null)"
+if [ -z "$status" ]; then
+  echo "✘ A réplica não está configurada ou o reader não respondeu."
+  exit 1
+fi
+campo() { awk -F': ' -v c="$1" '$1 ~ "^ *"c"$" {sub(/^[^:]*: /, ""); print; exit}' <<< "$status"; }
+io="$(campo Replica_IO_Running)"
+sql="$(campo Replica_SQL_Running)"
+atraso="$(campo Seconds_Behind_Source)"
+delay="$(campo SQL_Delay)"
+restante="$(campo SQL_Remaining_Delay)"
+erro_io="$(campo Last_IO_Error)"
+erro_sql="$(campo Last_SQL_Error)"
+
+printf "%-6s %s\n" "$io" "Thread de I/O: recebe o binlog do writer"
+printf "%-6s %s\n" "$sql" "Thread SQL: aplica as mudanças na réplica"
+printf "%-6s %s\n" "${atraso:-NULL} s" "Atraso medido (Seconds_Behind_Source)"
+printf "%-6s %s\n" "${delay:-0} s" "Atraso proposital (SQL_Delay)"
+if [ -n "$restante" ] && [ "$restante" != "NULL" ]; then
+  printf "%-6s %s\n" "$restante s" "Faltam para aplicar o próximo evento (SQL_Remaining_Delay)"
+fi
+[ -n "$erro_io" ] && echo "Último erro de I/O: $erro_io"
+[ -n "$erro_sql" ] && echo "Último erro SQL: $erro_sql"
+
+if [ "$io" = "Yes" ] && [ "$sql" = "Yes" ]; then
+  echo "✔ Replicação funcionando"
+else
+  echo "✘ Replicação parada — confira os erros acima ou rode 'reiniciar-lab'"
+  exit 1
+fi

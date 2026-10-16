@@ -1,0 +1,8 @@
+# Administração do WRITER (usado pelos comandos status-lab, reiniciar-lab...)
+# Senha fixa apenas para o laboratório.
+[client]
+host=127.0.0.1
+port=3306
+user=root
+password=root-lab
+default-character-set=utf8mb4

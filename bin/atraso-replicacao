@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Configura um atraso proposital na réplica (delayed replication).
+#   atraso-replicacao 10   -> o reader só aplica cada mudança 10 s depois que ela aconteceu no writer
+#   atraso-replicacao 0    -> volta ao normal
+set -euo pipefail
+# shellcheck source=bin/_comum.sh
+source "$(dirname "$(readlink -f "$0")")/_comum.sh"
+
+segundos="${1:-}"
+if ! [[ "$segundos" =~ ^[0-9]+$ ]] || [ "$segundos" -gt 3600 ]; then
+  echo "Uso: atraso-replicacao <segundos>   (0 a 3600; 0 remove o atraso)" >&2
+  exit 1
+fi
+
+# Só a thread SQL (que aplica as mudanças) precisa parar para trocar o atraso;
+# a thread de I/O continua recebendo o binlog normalmente.
+mysql_cfg admin-reader -e "STOP REPLICA SQL_THREAD;
+  CHANGE REPLICATION SOURCE TO SOURCE_DELAY = $segundos;
+  START REPLICA SQL_THREAD;"
+
+delay="$(mysql_cfg admin-reader -e "SHOW REPLICA STATUS\G" | awk -F': ' '$1 ~ /^ *SQL_Delay$/ {print $2}')"
+if [ "$segundos" -eq 0 ]; then
+  echo "✔ Atraso removido (SQL_Delay = ${delay} s). A réplica volta a acompanhar o writer quase em tempo real."
+else
+  echo "✔ Atraso configurado: o reader aplica cada mudança ${delay} s depois do writer."
+  echo "  Lembre-se de rodar 'atraso-replicacao 0' ao terminar o teste."
+fi

@@ -1,0 +1,56 @@
+{
+  "name": "bd-distribuido — MySQL Writer + Reader",
+  // Tag fixa: o feature docker-in-docker (moby) não tem pacotes para as versões mais novas do Ubuntu.
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "privileged": true,
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true,
+      "dockerDashComposeVersion": "v2"
+    }
+  },
+  // 2 núcleos e 8 GB bastam para os dois servidores MySQL (é a máquina padrão do Codespaces).
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb"
+  },
+  "containerEnv": {
+    "LANG": "C.UTF-8",
+    "TZ": "America/Sao_Paulo"
+  },
+  // Coloca no PATH os comandos do laboratório: sessao-a, sessao-b, status-lab, atraso-replicacao...
+  "remoteEnv": {
+    "PATH": "${containerWorkspaceFolder}/bin:${containerEnv:PATH}"
+  },
+  // Na criação: instala o cliente MySQL. A cada início: sobe o Writer e o Reader (docker compose).
+  "postCreateCommand": "bash .devcontainer/pos-criacao.sh",
+  "postStartCommand": "bash .devcontainer/iniciar-lab.sh",
+  "waitFor": "postStartCommand",
+  "forwardPorts": [3306, 3307],
+  "portsAttributes": {
+    "3306": {
+      "label": "MySQL Writer (Sessão A)",
+      "onAutoForward": "silent"
+    },
+    "3307": {
+      "label": "MySQL Reader (Sessão B)",
+      "onAutoForward": "silent"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-containers"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    },
+    "codespaces": {
+      "openFiles": [
+        "README.md"
+      ]
+    }
+  }
+}

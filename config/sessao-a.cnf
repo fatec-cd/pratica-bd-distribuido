@@ -1,0 +1,8 @@
+# Sessão A — usuário do aluno no WRITER
+# Senha fixa apenas para o laboratório.
+[client]
+host=127.0.0.1
+port=3306
+user=aluno
+password=aluno-lab
+default-character-set=utf8mb4

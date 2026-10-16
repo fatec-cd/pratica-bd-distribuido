@@ -1,0 +1,8 @@
+# Administração do READER (usado pelos comandos status-lab, atraso-replicacao...)
+# Senha fixa apenas para o laboratório.
+[client]
+host=127.0.0.1
+port=3307
+user=root
+password=root-lab
+default-character-set=utf8mb4

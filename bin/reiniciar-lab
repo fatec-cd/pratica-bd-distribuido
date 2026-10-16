@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Recria o ambiente do zero: apaga os dados dos dois servidores e refaz a replicação.
+set -euo pipefail
+# shellcheck source=bin/_comum.sh
+source "$(dirname "$(readlink -f "$0")")/_comum.sh"
+
+if [ "${1:-}" != "--sim" ]; then
+  echo "ATENÇÃO: isto apaga TODOS os dados do mysql-writer e do mysql-reader"
+  echo "(inclusive o banco ecommerce_central e todos os fragmentos criados)."
+  read -r -p "Digite SIM para continuar: " resposta
+  [ "$resposta" = "SIM" ] || { echo "Cancelado."; exit 0; }
+fi
+
+compose down -v
+compose up -d --wait --wait-timeout 420
+echo
+bash "$RAIZ/bin/status-lab"
+echo
+echo "Ambiente recriado. Recomece pela Parte 2 do roteiro (carga do banco)."

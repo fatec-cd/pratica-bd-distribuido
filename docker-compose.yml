@@ -1,0 +1,60 @@
+# Ambiente do laboratório: dois servidores MySQL 8.4.
+#   mysql-writer  -> primário: recebe todas as escritas            (porta 3306 · Sessão A)
+#   mysql-reader  -> réplica somente leitura, copia o Writer        (porta 3307 · Sessão B)
+# A replicação é assíncrona, pelo binlog, com GTID — a mesma técnica das réplicas
+# de leitura do Amazon RDS for MySQL e do Azure Database for MySQL.
+# Senhas fixas apenas para o laboratório: nunca faça isso em produção.
+
+name: bd-distribuido
+
+x-mysql: &mysql
+  image: mysql:8.4
+  restart: unless-stopped
+  environment:
+    MYSQL_ROOT_PASSWORD: root-lab
+    # Não carrega as tabelas de fuso horário (evita replicar essa carga inicial).
+    MYSQL_INITDB_SKIP_TZINFO: "1"
+    TZ: America/Sao_Paulo
+  healthcheck:
+    test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+    interval: 5s
+    timeout: 5s
+    retries: 60
+    start_period: 20s
+
+services:
+  mysql-writer:
+    <<: *mysql
+    container_name: mysql-writer
+    hostname: mysql-writer
+    command:
+      - --server-id=1
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+    ports:
+      - "3306:3306"
+    volumes:
+      - dados-writer:/var/lib/mysql
+      - ./mysql/writer:/docker-entrypoint-initdb.d:ro
+
+  mysql-reader:
+    <<: *mysql
+    container_name: mysql-reader
+    hostname: mysql-reader
+    command:
+      - --server-id=2
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --relay-log=mysql-reader-relay-bin
+    depends_on:
+      mysql-writer:
+        condition: service_healthy
+    ports:
+      - "3307:3306"
+    volumes:
+      - dados-reader:/var/lib/mysql
+      - ./mysql/reader:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  dados-writer:
+  dados-reader:

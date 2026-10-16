@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Lista os comandos do laboratório.
+cat << 'TEXTO'
+Comandos do laboratório
+  sessao-a                 abre a Sessão A, no WRITER (porta 3306) — todas as escritas
+  sessao-b                 abre a Sessão B, no READER (porta 3307) — leituras e conferências
+  status-lab               mostra contêineres, papel de cada servidor e estado da replicação
+  atraso-replicacao <s>    atrasa a réplica em <s> segundos (0 remove o atraso)
+  reiniciar-lab            apaga tudo e recria o ambiente do zero (pede confirmação)
+
+Dentro do cliente MySQL
+  source sql/criar_banco_ecommerce.sql    executa o script de carga (só na Sessão A)
+  SHOW REPLICA STATUS\G                    detalhes da replicação (na Sessão B)
+  pager less -S                            rolagem horizontal para resultados largos (nopager desliga)
+  exit                                     sai da sessão
+
+Contêineres (Docker)
+  docker compose ps                        lista os contêineres
+  docker compose stop mysql-reader         desliga a réplica (Tarefa 3.6)
+  docker compose start mysql-reader        liga a réplica de novo
+TEXTO

@@ -1,0 +1,8 @@
+# Sessão B — usuário do aluno no READER
+# Senha fixa apenas para o laboratório.
+[client]
+host=127.0.0.1
+port=3307
+user=aluno
+password=aluno-lab
+default-character-set=utf8mb4
