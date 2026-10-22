@@ -4,12 +4,26 @@
 
 **Disciplina:** Infraestrutura para Big Data  
 **Público:** Graduação em Ciência de Dados  
-🕐 **Tempo total estimado:** cerca de 2 horas e 40 minutos  
-👥 **Formato:** individual, com discussão em grupo na Parte 8  
+🕐 **Tempo total estimado:** cerca de 2 horas e 15 minutos  
+👥 **Formato:** individual  
 💻 **Ambiente:** GitHub Codespaces (sem instalação e sem custo)  
-📦 **Entrega:** um único PDF com as 15 evidências, pelo **Microsoft Teams**
+📦 **Entrega:** um único PDF com as 13 evidências, pelo **Microsoft Teams**
 
-> ℹ️ **Versão 2 (outubro/2026).** A AWS Academy deixou de permitir a criação de bancos Amazon Aurora. Nesta versão, o cluster na nuvem foi substituído por **dois servidores MySQL 8.4 em contêineres**, criados automaticamente no seu Codespace, com a mesma replicação assíncrona usada pelas réplicas de leitura do Amazon RDS for MySQL e do Azure Database for MySQL. Os conceitos e as tarefas de fragmentação são os mesmos.
+---
+
+## ⏱️ Tempo estimado por etapa
+
+| Etapa | Atividade | Tempo estimado |
+|-------|-----------|----------------|
+| Parte 1 | Preparação do ambiente | 15 min |
+| Parte 2 | Criação e carga do banco centralizado | 10 min |
+| Parte 3 | Validação dos dados e teste da replicação | 20 min |
+| Parte 4 | Fragmentação horizontal | 25 min |
+| Parte 5 | Fragmentação vertical | 25 min |
+| Parte 6 | Fragmentação híbrida | 10 min |
+| Parte 7 (bônus) | Fragmentação horizontal por faixa temporal | 10 min |
+
+As Partes 1 a 6 somam **1h45**; com o bônus, **1h55**. O tempo total estimado de **2h15** também considera cerca de 20 minutos para leitura do roteiro e organização da entrega.
 
 ---
 
@@ -865,133 +879,6 @@ SELECT 'pedidos_2025',    COUNT(*), MIN(data_pedido), MAX(data_pedido) FROM pedi
 
 ---
 
-## 💬 Parte 8 — Questões para Discussão (25 min)
-
-Depois de executar todos os comandos, discuta com seu grupo e **registre suas respostas por escrito, com suas próprias palavras**:
-
-### Questão 8.1
-
-**Qual fragmentação facilita esta consulta?**
-
-```sql
--- "Total de vendas por região em 2025"
-SELECT regiao_entrega,
-       COUNT(*) AS qtd_pedidos,
-       ROUND(SUM(valor_total), 2) AS receita
-FROM pedidos
-WHERE data_pedido >= '2025-01-01'
-GROUP BY regiao_entrega
-ORDER BY receita DESC;
-```
-
-<details>
-<summary>💡 Resposta</summary>
-
-Fragmentação **horizontal por região** — cada nó calcula localmente e depois consolida. Como a consulta também filtra por data, a fragmentação **por período** também ajuda (só o fragmento de 2025 seria lido); a combinação das duas seria a ideal.
-
-</details>
-
-### Questão 8.2
-
-**E esta consulta, qual fragmentação prejudica?**
-
-```sql
--- "Lista de clientes com score de crédito > 800"
-SELECT
-    p.nome, p.email, p.regiao,
-    s.score_credito, s.renda_mensal,
-    p.total_gasto
-FROM clientes_perfil_publico p
-JOIN clientes_dados_sensiveis s ON p.cliente_id = s.cliente_id
-WHERE s.score_credito > 800
-ORDER BY s.score_credito DESC;
-```
-
-<details>
-<summary>💡 Resposta</summary>
-
-A fragmentação **vertical** prejudica, pois requer JOIN entre fragmentos — o `score_credito` está nos dados sensíveis enquanto o `nome` está no perfil público.
-
-</details>
-
-### Questão 8.3
-
-**Como a LGPD se beneficia da fragmentação vertical?**
-
-<details>
-<summary>💡 Resposta</summary>
-
-Dados pessoais confidenciais (CPF, renda, score) ficam em um fragmento separado com controle de acesso mais restrito. Isso permite auditar e proteger dados pessoais de forma granular e aplicar o princípio da necessidade (art. 6º, III): um analista de marketing pode ter acesso apenas ao fragmento de perfil, sem nunca visualizar CPF ou renda.
-
-</details>
-
-### Questão 8.4
-
-**Qual é o custo de uma consulta global em fragmentação horizontal?**
-
-Execute e compare:
-
-```sql
-SELECT
-    'Consulta centralizada' AS tipo,
-    ROUND(AVG(total_gasto), 2) AS media_gasto
-FROM clientes
-
-UNION ALL
-
-SELECT
-    'Consulta distribuída (UNION ALL)' AS tipo,
-    ROUND(AVG(total_gasto), 2) AS media_gasto
-FROM (
-    SELECT total_gasto FROM clientes_sudeste
-    UNION ALL
-    SELECT total_gasto FROM clientes_sul
-    UNION ALL
-    SELECT total_gasto FROM clientes_nordeste
-) AS todos;
-```
-
-> **Ambas devem retornar o mesmo valor!** A diferença seria o custo de rede em um sistema distribuído real.
-
-> **📸 Evidência 14:** respostas das Questões 8.1 a 8.4, por escrito, com suas próprias palavras, incluindo o *screenshot* do resultado da Questão 8.4.
-
-### Questão 8.5
-
-**Quando a replicação (ter cópias de leitura) é mais indicada que o sharding (dividir os dados entre vários bancos)?**
-
-<details>
-<summary>💡 Resposta</summary>
-
-A **replicação** é mais indicada quando o sistema tem uma carga de leitura muito superior à escrita (ex.: catálogo de e-commerce com muitas consultas de produtos e poucos cadastros). Ela permite escalar as leituras adicionando mais réplicas. O **sharding** é mais adequado quando o volume total de dados ou a carga de escrita ultrapassa a capacidade de um único servidor — por exemplo, bilhões de registros de transações que precisam ser divididos por região ou faixa de valores.
-
-</details>
-
-### Questão 8.6
-
-**Você observou que as tabelas criadas no Writer (via `CREATE TABLE ... AS SELECT`) apareceram automaticamente no Reader. Em um cenário de sharding real, isso aconteceria? Qual a diferença?**
-
-<details>
-<summary>💡 Resposta</summary>
-
-Não. Em um ambiente **replicado** (como o deste laboratório), todas as operações DDL e DML do Writer chegam ao Reader pelo binlog — ambos possuem os mesmos dados. Em um cenário de **sharding** real, cada nó teria um subconjunto dos dados e as tabelas precisariam ser criadas explicitamente em cada nó. A replicação garante **alta disponibilidade** e **escalabilidade de leitura**, enquanto o sharding garante **escalabilidade de escrita** e **capacidade de armazenamento**.
-
-</details>
-
-### Questão 8.7
-
-**Na Tarefa 3.5, a réplica ficou 10 segundos atrasada. Imagine uma loja virtual que grava no Writer e lê no Reader: que problema o usuário poderia perceber logo depois de alterar o endereço de entrega? Que estratégia evitaria isso?**
-
-<details>
-<summary>💡 Resposta</summary>
-
-Logo após salvar, a tela seguinte — lida na réplica — poderia mostrar o **endereço antigo**, porque a mudança ainda não chegou ao Reader (inconsistência eventual). Uma estratégia comum é ler do **Writer** os dados que o próprio usuário acabou de alterar (*read-your-writes*), ou aguardar a réplica alcançar a transação (por exemplo, pelo GTID) antes de ler. Leituras que toleram atraso, como relatórios, continuam indo para a réplica.
-
-</details>
-
-> **📝 Evidência 15:** respostas das Questões 8.5, 8.6 e 8.7, por escrito, com suas próprias palavras.
-
----
-
 ## 📊 Resumo das Tabelas Criadas
 
 | Categoria | Tabelas |
@@ -1047,14 +934,11 @@ Você deverá submeter **um único documento PDF** contendo **todas** as evidên
 | 11 | Reconstrução da tabela original via JOIN | Screenshot | Parte 5 |
 | 12 | Contagem dos fragmentos híbridos | Screenshot | Parte 6 |
 | 13 | Fragmentos temporais com contagens e intervalos de datas | Screenshot | Parte 7 |
-| 14 | Respostas das Questões 8.1 a 8.4 (texto próprio + screenshot da 8.4) | Texto + Screenshot | Parte 8 |
-| 15 | Respostas das Questões 8.5 a 8.7 (texto próprio) | Texto | Parte 8 |
 
 ### Orientações Importantes
 
 - **Screenshots** devem mostrar claramente o resultado da consulta e o **prompt da sessão** (`SESSAO-A writer` ou `SESSAO-B reader`).
-- **Respostas textuais** devem ser escritas com suas **próprias palavras** — respostas copiadas literalmente do roteiro ou geradas por IA serão desconsideradas.
-- Certifique-se de que **todas as 15 evidências** estão presentes no documento antes de submeter.
+- Certifique-se de que **todas as 13 evidências** estão presentes no documento antes de submeter.
 - Em caso de dúvidas, consulte o professor durante a aula.
 
 ---
@@ -1134,8 +1018,7 @@ Antes de finalizar, verifique se você:
 - [ ] Executou todas as escritas na **Sessão A** e as conferências na **Sessão B**
 - [ ] Viu o registro de teste chegar à réplica com o atraso proposital — e voltou o atraso para **0**
 - [ ] Criou os fragmentos horizontais, verticais, híbridos e temporais (19 tabelas no total)
-- [ ] Respondeu às Questões 8.1 a 8.7 com suas próprias palavras
-- [ ] Reuniu as **15 evidências** em um único PDF, na ordem indicada, e o enviou pelo Microsoft Teams
+- [ ] Reuniu as **13 evidências** em um único PDF, na ordem indicada, e o enviou pelo Microsoft Teams
 - [ ] Excluiu o Codespace depois da entrega
 
 ---
